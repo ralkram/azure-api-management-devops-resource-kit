@@ -1,24 +1,38 @@
 ﻿using Xunit;
-using Microsoft.OpenApi.Models;
 using Microsoft.Azure.Management.ApiManagement.ArmTemplates.Common;
+using System;
+using System.IO;
+using Microsoft.Azure.Management.ApiManagement.ArmTemplates.Create;
 
 namespace Microsoft.Azure.Management.ApiManagement.ArmTemplates.Test
 {
     public class OpenAPISpecReaderTests
     {
+        private string openAPISpecFolder;
+
+        public OpenAPISpecReaderTests()
+        {
+            this.openAPISpecFolder = String.Concat("..", Path.DirectorySeparatorChar,
+                 "..", Path.DirectorySeparatorChar,
+                   "..", Path.DirectorySeparatorChar,
+                   "..", Path.DirectorySeparatorChar,
+                   "apimtemplate.test", Path.DirectorySeparatorChar,
+                   "Common", Path.DirectorySeparatorChar,
+                   "OpenAPISpecs", Path.DirectorySeparatorChar);
+        }
         [Fact]
-        public async void ShouldConvertOpenApiSpecToDocument()
+        public async void ShouldDetermineCorrectOpenAPISpecVersion()
         {
             // arrange
             OpenAPISpecReader openAPISpecReader = new OpenAPISpecReader();
-            string fileLocation = "https://petstore.swagger.io/v2/swagger.json";
 
             // act
-            OpenApiDocument doc = await openAPISpecReader.ConvertOpenAPISpecToDoc(fileLocation);
+            bool shouldOutputVersionTwo = await openAPISpecReader.isJSONOpenAPISpecVersionThreeAsync(String.Concat(this.openAPISpecFolder, "swaggerPetstore.json"));
+            bool shouldOutputVersionThree = await openAPISpecReader.isJSONOpenAPISpecVersionThreeAsync(String.Concat(this.openAPISpecFolder, "swaggerPetstorev3.json"));
 
             // assert
-            // document is only used to pull protocols, ensure servers is not null (contains protocols)
-            Assert.NotNull(doc.Servers);
+            Assert.False(shouldOutputVersionTwo);
+            Assert.True(shouldOutputVersionThree);
         }
     }
 }

@@ -1,8 +1,8 @@
-﻿using Microsoft.OpenApi.Models;
-using Xunit;
+﻿using Xunit;
 using Microsoft.Azure.Management.ApiManagement.ArmTemplates.Common;
 using Microsoft.Azure.Management.ApiManagement.ArmTemplates.Create;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Microsoft.Azure.Management.ApiManagement.ArmTemplates.Test
 {
@@ -20,8 +20,8 @@ namespace Microsoft.Azure.Management.ApiManagement.ArmTemplates.Test
                 apiVersion = "apiVersion",
                 apiVersionDescription = "apiVersionDescription",
                 apiVersionSetId = "apiVersionSetId",
-                revision = "revision",
-                revisionDescription = "revisionDescription",
+                apiRevision = "revision",
+                apiRevisionDescription = "revisionDescription",
                 suffix = "suffix",
                 subscriptionRequired = true,
                 authenticationSettings = new APITemplateAuthenticationSettings()
@@ -38,7 +38,10 @@ namespace Microsoft.Azure.Management.ApiManagement.ArmTemplates.Test
                     },
                     subscriptionKeyRequired = true
                 },
-                openApiSpec = "https://petstore.swagger.io/v2/swagger.json"
+                openApiSpec = "https://petstore.swagger.io/v2/swagger.json",
+                protocols = "https",
+                isCurrent = true,
+                type = "http"
             };
             creatorConfig.apis.Add(api);
 
@@ -50,9 +53,13 @@ namespace Microsoft.Azure.Management.ApiManagement.ArmTemplates.Test
             Assert.Equal(api.name, apiTemplateResource.properties.displayName);
             Assert.Equal(api.apiVersion, apiTemplateResource.properties.apiVersion);
             Assert.Equal(api.apiVersionDescription, apiTemplateResource.properties.apiVersionDescription);
+            Assert.Equal(api.type, apiTemplateResource.properties.type);
+            Assert.Equal(api.type, apiTemplateResource.properties.apiType);
+            Assert.Equal(api.isCurrent, apiTemplateResource.properties.isCurrent);
+            Assert.Equal(new string[] { api.protocols }, apiTemplateResource.properties.protocols);
             Assert.Equal($"[resourceId('Microsoft.ApiManagement/service/apiVersionSets', parameters('ApimServiceName'), '{api.apiVersionSetId}')]", apiTemplateResource.properties.apiVersionSetId);
-            Assert.Equal(api.revision, apiTemplateResource.properties.apiRevision);
-            Assert.Equal(api.revisionDescription, apiTemplateResource.properties.apiRevisionDescription);
+            Assert.Equal(api.apiRevision, apiTemplateResource.properties.apiRevision);
+            Assert.Equal(api.apiRevisionDescription, apiTemplateResource.properties.apiRevisionDescription);
             Assert.Equal(api.suffix, apiTemplateResource.properties.path);
             Assert.Equal(api.subscriptionRequired, apiTemplateResource.properties.subscriptionRequired);
             Assert.Equal(api.authenticationSettings.oAuth2.authorizationServerId, apiTemplateResource.properties.authenticationSettings.oAuth2.authorizationServerId);
@@ -96,8 +103,8 @@ namespace Microsoft.Azure.Management.ApiManagement.ArmTemplates.Test
                 apiVersion = "apiVersion",
                 apiVersionDescription = "apiVersionDescription",
                 apiVersionSetId = "apiVersionSetId",
-                revision = "revision",
-                revisionDescription = "revisionDescription",
+                apiRevision = "revision",
+                apiRevisionDescription = "revisionDescription",
                 suffix = "suffix",
                 subscriptionRequired = true,
                 authenticationSettings = new APITemplateAuthenticationSettings()
@@ -115,6 +122,9 @@ namespace Microsoft.Azure.Management.ApiManagement.ArmTemplates.Test
                     subscriptionKeyRequired = true
                 },
                 openApiSpec = "https://petstore.swagger.io/v2/swagger.json",
+                protocols = "https",
+                isCurrent = true,
+                type = "http"
             };
             creatorConfig.apis.Add(api);
 
@@ -125,10 +135,14 @@ namespace Microsoft.Azure.Management.ApiManagement.ArmTemplates.Test
             Assert.Equal($"[concat(parameters('ApimServiceName'), '/{api.name}')]", apiTemplateResource.name);
             Assert.Equal(api.name, apiTemplateResource.properties.displayName);
             Assert.Equal(api.apiVersion, apiTemplateResource.properties.apiVersion);
+            Assert.Equal(api.type, apiTemplateResource.properties.type);
+            Assert.Equal(api.type, apiTemplateResource.properties.apiType);
+            Assert.Equal(api.isCurrent, apiTemplateResource.properties.isCurrent);
+            Assert.Equal(new string[] { api.protocols }, apiTemplateResource.properties.protocols);
             Assert.Equal(api.apiVersionDescription, apiTemplateResource.properties.apiVersionDescription);
             Assert.Equal($"[resourceId('Microsoft.ApiManagement/service/apiVersionSets', parameters('ApimServiceName'), '{api.apiVersionSetId}')]", apiTemplateResource.properties.apiVersionSetId);
-            Assert.Equal(api.revision, apiTemplateResource.properties.apiRevision);
-            Assert.Equal(api.revisionDescription, apiTemplateResource.properties.apiRevisionDescription);
+            Assert.Equal(api.apiRevision, apiTemplateResource.properties.apiRevision);
+            Assert.Equal(api.apiRevisionDescription, apiTemplateResource.properties.apiRevisionDescription);
             Assert.Equal(api.suffix, apiTemplateResource.properties.path);
             Assert.Equal(api.subscriptionRequired, apiTemplateResource.properties.subscriptionRequired);
             Assert.Equal(api.authenticationSettings.oAuth2.authorizationServerId, apiTemplateResource.properties.authenticationSettings.oAuth2.authorizationServerId);
@@ -141,25 +155,30 @@ namespace Microsoft.Azure.Management.ApiManagement.ArmTemplates.Test
         }
 
         [Fact]
-        public void ShouldCreateProtocolsFromOpenApiDocument()
+        public async void ShouldAppendRevisionToAPIName()
         {
             // arrange
             APITemplateCreator apiTemplateCreator = APITemplateCreatorFactory.GenerateAPITemplateCreator();
-            OpenApiDocument openApiDocument = new OpenApiDocument();
-            int count = 2;
-            for (int i = 0; i < count; i++)
+            CreatorConfig creatorConfig = new CreatorConfig() { apis = new List<APIConfig>() };
+            APIConfig api = new APIConfig()
             {
-                openApiDocument.Servers.Add(new OpenApiServer()
-                {
-                    Url = $"{i}:{i}"
-                });
-            }
+                name = "name",
+                apiRevision = "2",
+                isCurrent = true,
+                suffix = "suffix",
+                subscriptionRequired = true,
+                openApiSpec = "https://petstore.swagger.io/v2/swagger.json",
+            };
+            creatorConfig.apis.Add(api);
 
             // act
-            string[] protocols = apiTemplateCreator.CreateProtocols(openApiDocument);
+            // the above api config will create a unified api template with a single resource
+            List<Template> apiTemplates = await apiTemplateCreator.CreateAPITemplatesAsync(api);
+            APITemplateResource apiTemplateResource = apiTemplates.FirstOrDefault().resources[0] as APITemplateResource;
 
             // assert
-            Assert.Equal(count, protocols.Length);
+            Assert.Contains(";rev", apiTemplateResource.name);
         }
     }
+
 }
